@@ -1,0 +1,20 @@
+# Local inputs, exports and diagnostics
+*.gpx
+*.tcx
+*.har
+*.zip
+*.log
+artifacts/
+# Credentials and local tool settings
+.env
+.env.*
+*.pem
+*.key
+.codex/
+.agents/
+# OS/editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
