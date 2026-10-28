@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Локальный генератор синтетических беговых тренировок TCX из GPX для тестирования импорта.">
+  <meta name="color-scheme" content="light dark"><title>Тренировка из GPX</title>
+  <link rel="stylesheet" href="./style.css?v=10">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="./app.js?v=10"></script>
+</head>
+<body>
+  <main>
+    <header class="page-header"><div><h1>Тренировка из GPX</h1><p>Загрузите маршрут, настройте бег и скачайте TCX для тестового импорта.</p></div><button id="theme" class="icon-button" aria-label="Переключить тему" title="Переключить тему">◐</button></header>
+    <div id="status" class="status" role="status" aria-live="polite">Выберите GPX-файл, чтобы начать.</div>
+    <section id="upload" class="step-section">
+      <div class="step-heading"><span class="number">1</span><h2>Загрузите маршрут</h2></div>
+      <div class="panel upload-panel">
+        <label class="dropzone" id="dropzone"><input id="file" type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml"><strong>Выбрать GPX-файл</strong><span>или перетащить сюда · до 32 МБ</span></label>
+        <details class="help gpx-guide"><summary>Где взять GPX-файл?</summary>
+          <p>Нарисуйте маршрут бесплатно в <a href="https://gpx.studio/app" target="_blank" rel="noopener noreferrer">GPX Studio</a>:</p>
+          <ol><li>Нажмите <b>карандаш</b> слева — инструмент <b>Plan or edit a route</b> (построение маршрута).</li><li>Найдите свой город через поле <b>Search</b> на карте и приблизьте нужные улицы.</li><li>В панели инструмента выберите <b>Activity → Run/hike</b> (бег / пеший маршрут). Оставьте <b>Routing</b> включённым, чтобы линия шла по дорогам и тропам.</li><li>Нажмите на карте в точке <b>A</b> — это старт, затем в точке <b>B</b> — финиш. Добавляйте промежуточные точки, чтобы провести маршрут по нужным улицам; точки можно перетаскивать.</li><li>Откройте <b>File → Export…</b> и сохраните GPX-файл на устройство. Вернитесь сюда и загрузите его кнопкой выше.</li></ol>
+          <p>Дата, время и темп из GPX не нужны — они задаются здесь. <a href="https://gpx.studio/help/toolbar/routing" target="_blank" rel="noopener noreferrer">Справка GPX Studio</a></p>
+        </details>
+
+        <div id="route-info" class="route-info" hidden></div>
+      </div>
+      <div id="map-panel" class="map-panel panel" hidden><div id="map" aria-label="Карта маршрута"></div><div id="map-detail" class="map-footer"></div></div>
+    </section>
+    <section id="preview" class="step-section" hidden>
+      <div class="step-heading"><span class="number">2</span><h2>Настройте тренировку</h2><span id="preview-state" class="tag">Ожидает GPX</span></div>
+      <div class="settings-layout"><div id="settings" class="panel"><form id="form">
+            <label class="field">Дата и время начала<input id="start" type="datetime-local" required><small>Время выбранного часового пояса. В TCX записывается UTC.</small></label>
+            <label class="field">Часовой пояс<select id="timeZone"><option value="Europe/Kyiv">Украина — Киев</option><option value="Europe/Berlin">Германия — Берлин</option></select><small>При смене пояса время переводится автоматически. Летнее и зимнее время учитываются.</small></label>
+            <div class="parameter"><div class="parameter-head"><label for="pace">Ориентир темпа</label><div class="value-input"><input id="pace" value="6:00" inputmode="numeric" pattern="[0-9]{1,2}:[0-5][0-9]" required aria-describedby="pace-unit"><span id="pace-unit">мин/км</span></div></div><input id="pace-range" type="range" min="180" max="1200" step="1" value="360" aria-label="Ориентир темпа"><div class="range-labels"><span>3:00</span><span>20:00</span></div><p class="field-hint">Итоговое среднее немного отличается от ориентира. При нулевом отклонении темп постоянный.</p></div>
+            <div class="parameter"><div class="parameter-head"><label for="paceDeviation">Отклонение темпа</label><div class="value-input"><span>±</span><input id="paceDeviation" type="number" min="0" max="120" value="30" required><span>с/км</span></div></div><input id="paceDeviation-range" type="range" min="0" max="120" value="30" aria-label="Отклонение темпа"><p id="pace-bounds" class="field-hint">Диапазон 5:30 — 6:30 мин/км</p></div>
+            <div class="parameter"><div class="parameter-head"><label for="cadence">Средний каденс</label><div class="value-input"><input id="cadence" type="number" min="100" max="240" value="170" required><span>шаг/мин</span></div></div><input id="cadence-range" type="range" min="100" max="240" value="170" aria-label="Средний каденс"><div class="range-labels"><span>100</span><span>240</span></div></div>
+            <div class="parameter"><div class="parameter-head"><label for="cadenceDeviation">Отклонение каденса</label><div class="value-input"><span>±</span><input id="cadenceDeviation" type="number" min="0" max="30" value="5" required><span>шаг/мин</span></div></div><input id="cadenceDeviation-range" type="range" min="0" max="30" value="5" aria-label="Отклонение каденса"><p id="cadence-bounds" class="field-hint">Диапазон 165 — 175 шаг/мин · обе ноги</p></div>
+            <details class="help"><summary>Как выбрать каденс?</summary><p>Каденс нужен для расчёта шагов и длины шага на этом сайте. В TCX он не записывается.</p><p>Для спокойного бега лучше взять своё измерение. Пробегите несколько минут в удобном темпе, затем за 30 секунд посчитайте касания земли одной ногой и умножьте на 4. Например, 42 касания — это 168 шагов/мин обеими ногами. Повторите измерение 2–3 раза и возьмите среднее.</p><p>Если пока не измеряли, 170 ±5 можно оставить как пример для тестового файла. Это не универсальная норма и не цель, под которую нужно менять свой бег. Темп выбирайте свой обычный спокойный.</p><p><a href="https://pubmed.ncbi.nlm.nih.gov/37868213/" target="_blank" rel="noopener noreferrer">Исследование индивидуальных различий у любителей</a></p></details>
+            <details class="advanced"><summary>Добавить пульс (необязательно)</summary>
+              <label class="check-field"><input id="heartRateEnabled" type="checkbox">Записать синтетический пульс</label>
+              <div id="hr-fields" hidden>
+                <div class="parameter"><div class="parameter-head"><label for="heartRate">Ориентир пульса</label><div class="value-input"><input id="heartRate" type="number" min="80" max="200" value="145" required disabled><span>уд/мин</span></div></div><input id="heartRate-range" type="range" min="80" max="200" value="145" aria-label="Ориентир пульса"></div>
+                <div class="parameter"><div class="parameter-head"><label for="heartRateDeviation">Отклонение пульса</label><div class="value-input"><span>±</span><input id="heartRateDeviation" type="number" min="0" max="30" value="12" required disabled><span>уд/мин</span></div></div><input id="heartRateDeviation-range" type="range" min="0" max="30" value="12" aria-label="Отклонение пульса"><p id="hr-bounds" class="field-hint"></p></div>
+              </div><p>Разогрев, колебания и реакция на скорость с задержкой. Итоговое среднее немного отличается от ориентира. Возьмите среднее из своей обычной пробежки; 145 ±12 — только пример для тестирования.</p>
+            </details>
+            <details class="advanced"><summary>Код настроек (seed)</summary><label class="field seed-field">Скопируйте код или вставьте сохранённый<textarea id="seed" rows="3" maxlength="2048" required spellcheck="false" aria-describedby="seed-help"></textarea><small id="seed-help">Код содержит дату, часовой пояс, темп, каденс, пульс и случайное значение. Время в коде — UTC; при вставке оно переводится в выбранный пояс. Настройки восстанавливаются автоматически. Для той же тренировки нужен тот же GPX.</small></label><button id="copy-seed" type="button" class="text-button">Копировать код</button></details>
+            <button id="generate" class="button primary full" type="submit" disabled>Создать тренировку</button>
+          </form></div><div id="profile-panel" class="panel profiles" hidden><div class="section-heading"><h3>Графики</h3><button id="regenerate" class="text-button" disabled>Новый вариант</button></div><div class="chart-block"><div class="chart-title"><h3>Темп</h3><span>мин/км</span></div><canvas id="pace-chart" role="img" aria-label="Темп по дистанции"></canvas></div><div class="chart-block"><div class="chart-title"><h3>Каденс</h3><span>шаг/мин · обе ноги</span></div><canvas id="cadence-chart" role="img" aria-label="Каденс по дистанции"></canvas></div><div class="chart-block"><div class="chart-title"><h3>Скорость</h3><span>м/с</span></div><canvas id="speed-chart" role="img" aria-label="Скорость по дистанции"></canvas></div><div id="hr-chart-block" class="chart-block" hidden><div class="chart-title"><h3>Пульс</h3><span>уд/мин</span></div><canvas id="hr-chart" role="img" aria-label="Пульс по дистанции"></canvas></div><details class="advanced"><summary>Точность расчёта</summary><p id="consistency"></p></details></div></div>
+    </section>
+    <section id="export" class="step-section" hidden>
+      <div class="step-heading"><span class="number">3</span><h2>Скачайте файл</h2></div>
+      <div class="panel">
+        <div class="metrics"><div class="metric"><span>Дистанция</span><strong id="distance">—</strong><small>км</small></div><div class="metric"><span>Длительность</span><strong id="duration">—</strong><small>чч:мм:сс</small></div><div class="metric"><span>Средний темп</span><strong id="avg-pace">—</strong><small>мин/км</small></div><div class="metric"><span>Каденс</span><strong id="avg-cadence">—</strong><small>шаг/мин · обе ноги</small></div><div class="metric"><span>Шаги</span><strong id="steps-total">—</strong><small>расчётное число</small></div><div class="metric"><span>Калории ≈</span><strong id="calories">—</strong><small>ккал · оценка для 70 кг</small></div><div id="hr-metric" class="metric" hidden><span>Средний пульс</span><strong id="avg-hr">—</strong><small>уд/мин</small></div></div>
+        <p id="export-info" class="privacy-note"></p><button id="download" class="button primary full" disabled>Скачать TCX</button>
+        <p class="privacy-note">Синтетическая тренировка для тестирования. Файл обрабатывается локально.</p>
+        <details class="help runkeeper-guide"><summary>Как загрузить файл в Runkeeper?</summary>
+          <ol><li>Откройте <a href="https://runkeeper.com" target="_blank" rel="noopener noreferrer">runkeeper.com</a> в Google Chrome и войдите <b>в тот же аккаунт, который используете в приложении на телефоне</b>. Если сомневаетесь, сверьте email в настройках приложения.</li><li>Нажмите <b>Log</b>, прокрутите до <b>Trying to Upload Multiple Files?</b> и выберите <b>Get Started</b>.</li><li>Выберите скачанный TCX.</li><li>Дождитесь сообщения <b>Successfully uploaded the following files</b>, нажмите <b>Done</b> и проверьте историю на сайте.</li><li>Откройте приложение Runkeeper на телефоне с интернетом: после синхронизации тренировка появится в истории этого аккаунта. Это может занять некоторое время; обновите историю или откройте приложение снова.</li></ol>
+          <p>Поддержка пульса, калорий и других полей зависит от Runkeeper. Калории — условная оценка для 70 кг, а пульс моделируется. Перед повторной загрузкой проверьте историю на дубликаты.</p>
+          <p class="source-links"><a href="https://help.runkeeper.com/en/hc/bulk-import-gpx-tcx-and-fit-files-to-runkeeper" target="_blank" rel="noopener noreferrer">Инструкция импорта</a> · <a href="https://help.runkeeper.com/en/hc/how-to-log-in-to-runkeeper" target="_blank" rel="noopener noreferrer">Вход в аккаунт</a></p>
+        </details>
+      </div>
+    </section>
+    <footer>Настройки сохраняются в браузере. GPX-файлы не сохраняются.</footer>
+  </main>
+  <noscript>Для импорта GPX и генерации TCX включите JavaScript в браузере.</noscript>
+</body>
+</html>
